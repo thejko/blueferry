@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from blueferry import __version__  # noqa: E402
 from blueferry.i18n import _  # noqa: E402
@@ -36,8 +36,22 @@ _CSS = """
 
 class BlueFerryApp(Adw.Application):
     def __init__(self) -> None:
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        # HANDLES_COMMAND_LINE so --thread reaches an already-running instance
+        # instead of being dropped: GApplication forwards the command line to
+        # the primary instance, and starts one when there is none.
+        super().__init__(
+            application_id=APP_ID,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+        )
         self._client: DaemonClient | None = None
+        self.add_main_option(
+            "thread",
+            0,
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.STRING,
+            _("Open the conversation with this thread key"),
+            "KEY",
+        )
 
     def do_startup(self) -> None:
         Adw.Application.do_startup(self)
@@ -106,6 +120,15 @@ class BlueFerryApp(Adw.Application):
             win = MainWindow(application=self, client=self._client)
         win.present()
         win.present_initial_setup()
+
+    def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
+        options = command_line.get_options_dict().end().unpack()
+        self.activate()
+        key = options.get("thread", "")
+        window = self.props.active_window
+        if key and window is not None:
+            window.open_thread(key)
+        return 0
 
     def do_shutdown(self) -> None:
         if self._client is not None:

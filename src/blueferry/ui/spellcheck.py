@@ -1,8 +1,16 @@
 """Spell-checked message entry.
 
-libspelling attaches to a GtkSourceView buffer rather than a plain
-GtkTextBuffer, so composers build a GtkSource.View. It subclasses
-Gtk.TextView, so callers keep the same buffer, controller, and margin API.
+libspelling's adapter takes a GtkSource.Buffer rather than a plain
+GtkTextBuffer, but nothing requires the *widget* to be a GtkSource.View. So
+the composer stays an ordinary Gtk.TextView holding a GtkSource.Buffer.
+
+That distinction matters for appearance: GtkSource.View paints itself from a
+GtkSourceView style scheme, which defaults to the light "classic" scheme and
+renders a white box in a dark theme. A plain Gtk.TextView takes its colors
+from libadwaita like every other widget in the window.
+
+Misspellings come through as a buffer tag with Pango's error underline, so
+they render in a plain view.
 
 Everything here degrades: without libspelling, its typelib, or an installed
 dictionary the caller still gets a working editor, just an unchecked one.
@@ -33,7 +41,7 @@ def build_message_view(**properties: Any) -> Gtk.TextView:
         log.debug("libspelling unavailable; composing without spell check")
         return Gtk.TextView(**properties)
 
-    view = GtkSource.View(**properties)
+    view = Gtk.TextView(buffer=GtkSource.Buffer(), **properties)
     _attach_spelling(view)
     return view
 

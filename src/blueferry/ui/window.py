@@ -102,6 +102,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._initial_setup_pending = False
         self.present_phone_settings()
 
+    def open_thread(self, key: str) -> None:
+        """Bring the window forward on a specific conversation."""
+        self._phone_dialog.close()
+        self.present()
+        self.messages.open_thread(key)
+
     def _on_open_message_requested(self, _client, handle: str) -> None:
         self._phone_dialog.close()
         self.present()

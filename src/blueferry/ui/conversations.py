@@ -127,6 +127,7 @@ class ConversationsPage(Gtk.Box):
         self._toast = toast
         self._state = ConversationState(select_first=False)
         self._pending_open_handle: str | None = None
+        self._pending_open_thread: str | None = None
         self._reload_pending = False
         self._reload_again = False
         self._new_destination: str | None = None
@@ -370,6 +371,33 @@ class ConversationsPage(Gtk.Box):
         if not self._select_pending_message():
             self._reload_threads()
 
+    def open_thread(self, key: str) -> None:
+        """Select a thread by key, refreshing if it is not loaded yet."""
+        self._pending_open_thread = key
+        if not self._select_pending_thread():
+            self._reload_threads()
+
+    def _select_pending_thread(self) -> bool:
+        key = self._pending_open_thread
+        if not key:
+            return False
+
+        row = self._thread_list.get_first_child()
+        while row is not None and getattr(row, "thread_key", None) != key:
+            row = row.get_next_sibling()
+        if row is None:
+            return False
+
+        self._pending_open_thread = None
+        self._state.selected_key = key
+        # select_row is a no-op when the row is already selected, so drive the
+        # handler directly in that case or the conversation never opens.
+        if self._thread_list.get_selected_row() is row:
+            self._on_thread_selected(self._thread_list, row)
+        else:
+            self._thread_list.select_row(row)
+        return True
+
     def _select_pending_message(self) -> bool:
         handle = self._pending_open_handle
         if not handle:
@@ -552,6 +580,7 @@ class ConversationsPage(Gtk.Box):
             self._stack.set_visible_child_name("empty")
         self._reload_finished()
         self._select_pending_message()
+        self._select_pending_thread()
         self._maybe_warn_roster_change()
         return False
 
