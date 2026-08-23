@@ -15,6 +15,8 @@ LOCAL_ENV_KEYS = frozenset({
     "BLUEFERRY_ANCS_ENABLED",
     "BLUEFERRY_SHOW_NOTIFICATION_CONTENT",
     "BLUEFERRY_NOTIFICATION_TIMEOUT_MS",
+    "BLUEFERRY_NOTIFICATION_URGENCY",
+    "BLUEFERRY_NOTIFICATION_SOUND",
     "BLUEFERRY_HISTORY_RETENTION_DAYS",
     "BLUEFERRY_HISTORY_MAX_EVENTS",
     "BLUEFERRY_HISTORY_MAX_PAYLOAD_BYTES",
@@ -136,6 +138,11 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().casefold() not in {"0", "false", "no", "off"}
 
 
+def _env_choice(name: str, default: str, allowed: frozenset[str]) -> str:
+    value = os.environ.get(name, default).strip().casefold()
+    return value if value in allowed else default
+
+
 def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     try:
         value = int(os.environ.get(name, str(default)))
@@ -157,6 +164,30 @@ SHOW_NOTIFICATION_CONTENT: bool = _env_bool(
 NOTIFICATION_TIMEOUT_MS: int = _env_int(
     "BLUEFERRY_NOTIFICATION_TIMEOUT_MS", 8_000, 1_000, 60_000
 )
+
+NOTIFICATION_URGENCIES: frozenset[str] = frozenset({"low", "normal", "critical"})
+NOTIFICATION_URGENCY: str = _env_choice(
+    "BLUEFERRY_NOTIFICATION_URGENCY", "critical", NOTIFICATION_URGENCIES
+)
+"""Urgency byte for message popups.
+
+`critical` is the default because a message you miss is worse than a popup you
+have to dismiss. Notification daemons keep critical popups on screen until they
+are acted on, which makes NOTIFICATION_TIMEOUT_MS moot at that level. Nothing
+is stranded: dismissing marks the message read on the iPhone, and reading it on
+the iPhone closes the popup.
+"""
+
+NOTIFICATION_SOUND: str = os.environ.get(
+    "BLUEFERRY_NOTIFICATION_SOUND", "message-new-instant"
+).strip()
+"""Sound for an incoming message: an XDG sound-theme name, an absolute path to
+an audio file, or empty to stay silent.
+
+Played by the daemon rather than requested through a notification hint, because
+notification servers are not required to implement sound and many do not
+advertise the `sound` capability at all.
+"""
 HISTORY_RETENTION_DAYS: int = _env_int(
     "BLUEFERRY_HISTORY_RETENTION_DAYS", 30, 1, 3650
 )

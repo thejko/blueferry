@@ -33,6 +33,7 @@ from blueferry.notification_policy import (
     DEFAULT_NOTIFICATION_POLICY,
     NO_NOTIFICATIONS,
 )
+from blueferry.sinks.alert_sound import AlertSound
 from blueferry.text_safety import terminal_text
 
 
@@ -44,6 +45,10 @@ log = logging.getLogger(__name__)
 _APP_NAME = "BlueFerry"
 _BODY_LIMIT = 280
 _MESSAGE_EXPIRE_MS = config.NOTIFICATION_TIMEOUT_MS
+# Servers keep a critical popup up until it is acted on, which is the point:
+# an unanswered message should not quietly time out. The expiry below is still
+# sent so a server that ignores urgency has something to work with.
+_URGENCY = {"low": 0, "normal": 1, "critical": 2}[config.NOTIFICATION_URGENCY]
 # ANCS mirrors ordinary iPhone app/system notifications. Unlike MAP messages,
 # they have no desktop-to-phone read-state path, so keeping every popup around
 # indefinitely only creates notification-center clutter.
@@ -69,6 +74,9 @@ def _mark_message_read(message_path: str) -> None:
 
 class LibnotifySink:
     name = "libnotify"
+    # Tests build this sink with __new__ and set only what they exercise, so
+    # give the alert a class-level default rather than relying on __init__.
+    _alert: AlertSound | None = None
     # New sinks fail closed in EventDispatcher. This one accepts system ANCS
     # only to create an immediate transient popup; it retains no event data.
     accepts_system_ancs = True
@@ -83,6 +91,7 @@ class LibnotifySink:
         self._submit_obex = submit_obex
         self._notification_policy = notification_policy
         self._on_open_message = on_open_message
+        self._alert = AlertSound(config.NOTIFICATION_SOUND)
         self._notif = dbus.Interface(
             get_session_bus().get_object(
                 "org.freedesktop.Notifications",
@@ -133,6 +142,11 @@ class LibnotifySink:
         # untrusted input, so escape it before handing it to the shell.
         title = escape(terminal_text(title).replace("\n", " "))
         body = escape(terminal_text(body))
+        # Alert before the Notify call, not after. When the notification
+        # server is unreachable the sound is the only thing left telling you a
+        # message arrived, which is exactly when you most want it.
+        if self._alert is not None:
+            self._alert.play()
         try:
             # A deliberate dismissal is propagated as mark-read. Expiration
             # is reason=1 and therefore leaves the iPhone's read state alone.
@@ -145,7 +159,7 @@ class LibnotifySink:
                 title,
                 body,
                 dbus.Array(actions, signature="s"),
-                dbus.Dictionary({"urgency": dbus.Byte(1)}, signature="sv"),
+                dbus.Dictionary({"urgency": dbus.Byte(_URGENCY)}, signature="sv"),
                 dbus.Int32(_MESSAGE_EXPIRE_MS),
             ))
         except dbus.exceptions.DBusException as e:
