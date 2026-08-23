@@ -16,6 +16,7 @@ from blueferry.conversation_state import (
 )
 from blueferry.i18n import _
 from blueferry.models import BackendStatus, Thread, ThreadMessage
+from blueferry.ui.spellcheck import build_message_view
 from blueferry.ui.status_presenter import (
     map_connection_refused,
     map_connection_refused_message,
@@ -37,7 +38,7 @@ class MessageComposer(Gtk.ScrolledWindow):
             propagate_natural_height=True,
             hexpand=True,
         )
-        self._view = Gtk.TextView(
+        self._view = build_message_view(
             accepts_tab=False,
             wrap_mode=Gtk.WrapMode.WORD_CHAR,
             top_margin=8,

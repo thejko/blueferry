@@ -27,6 +27,7 @@ checkdepends=(
   'libadwaita'
   'kirigami'
   'libsecret'
+  'libspelling'
   'mypy'
   'python-cryptography'
   'python-coverage'
@@ -170,7 +171,9 @@ package_blueferry-gtk() {
   depends=(
     "blueferry-backend=$pkgver-$pkgrel"
     'gtk4'
+    'hunspell-en_us'
     'libadwaita>=1.5'
+    'libspelling'
     'python-gobject'
   )
 
