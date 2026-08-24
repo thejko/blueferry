@@ -17,6 +17,7 @@ LOCAL_ENV_KEYS = frozenset({
     "BLUEFERRY_NOTIFICATION_TIMEOUT_MS",
     "BLUEFERRY_NOTIFICATION_URGENCY",
     "BLUEFERRY_NOTIFICATION_SOUND",
+    "BLUEFERRY_OPEN_MESSAGE_COMMAND",
     "BLUEFERRY_HISTORY_RETENTION_DAYS",
     "BLUEFERRY_HISTORY_MAX_EVENTS",
     "BLUEFERRY_HISTORY_MAX_PAYLOAD_BYTES",
@@ -176,6 +177,18 @@ have to dismiss. Notification daemons keep critical popups on screen until they
 are acted on, which makes NOTIFICATION_TIMEOUT_MS moot at that level. Nothing
 is stranded: dismissing marks the message read on the iPhone, and reading it on
 the iPhone closes the popup.
+"""
+
+OPEN_MESSAGE_COMMAND: str = os.environ.get(
+    "BLUEFERRY_OPEN_MESSAGE_COMMAND", "blueferry-gtk"
+).strip()
+"""Client to launch when a notification's default action fires, or empty to
+only signal clients that already happen to be running.
+
+OpenMessageRequested reaches live clients only, so with no window open,
+clicking a notification did nothing. This is launched with `--message HANDLE`;
+the GTK client handles its own command line, so an instance that is already
+running gets the request instead of a second window.
 """
 
 NOTIFICATION_SOUND: str = os.environ.get(

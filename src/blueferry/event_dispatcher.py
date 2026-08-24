@@ -7,7 +7,9 @@ import logging
 from collections import OrderedDict
 from hashlib import blake2b
 
+from blueferry import config
 from blueferry.ancs.constants import MESSAGES_APP_ID
+from blueferry.commands import spawn_detached
 from blueferry.events import sms_group_sent_event, sms_sent_event
 from blueferry.limits import MAX_ANCS_FINGERPRINTS
 from blueferry.sinks import Sink
@@ -89,8 +91,15 @@ class EventDispatcher:
         self.dbus_service = service
 
     def _open_message(self, handle: str) -> None:
+        # Signal the clients that are already running...
         if self.dbus_service is not None:
             self.dbus_service.emit_open_message(handle)
+        # ...and launch one, because the signal reaches nothing when no window
+        # is open, which is exactly when clicking a notification is useful. The
+        # client is single-instance, so a running one takes the request rather
+        # than opening a second window.
+        if config.OPEN_MESSAGE_COMMAND:
+            spawn_detached([config.OPEN_MESSAGE_COMMAND, "--message", handle])
 
     def message(self, event) -> None:
         if getattr(event, "kind", "") == "sms_received" and self.on_incoming_message is not None:

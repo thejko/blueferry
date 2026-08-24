@@ -44,3 +44,27 @@ def run_command(
             returncode=result.returncode,
         )
     return result
+
+
+def spawn_detached(argv: Sequence[str]) -> bool:
+    """Start a command and return immediately, without waiting for it.
+
+    For launching a GUI client from the daemon, where waiting would stall the
+    event loop and the exit status is of no interest. Returns whether the
+    child started; a missing binary is a False, not an exception.
+    """
+    command = [str(value) for value in argv]
+    if not command or not command[0]:
+        raise ValueError("command argv must not be empty")
+    try:
+        # Values are passed directly as argv, never interpreted as shell text.
+        subprocess.Popen(  # nosec B603
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return False
+    return True

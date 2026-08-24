@@ -108,6 +108,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.present()
         self.messages.open_thread(key)
 
+    def open_message_handle(self, handle: str) -> None:
+        """Bring the window forward on the conversation holding a message."""
+        self._on_open_message_requested(None, handle)
+
     def _on_open_message_requested(self, _client, handle: str) -> None:
         self._phone_dialog.close()
         self.present()

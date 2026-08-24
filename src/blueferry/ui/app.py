@@ -52,6 +52,14 @@ class BlueFerryApp(Adw.Application):
             _("Open the conversation with this thread key"),
             "KEY",
         )
+        self.add_main_option(
+            "message",
+            0,
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.STRING,
+            _("Open the conversation holding this message handle"),
+            "HANDLE",
+        )
 
     def do_startup(self) -> None:
         Adw.Application.do_startup(self)
@@ -124,10 +132,15 @@ class BlueFerryApp(Adw.Application):
     def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
         options = command_line.get_options_dict().end().unpack()
         self.activate()
-        key = options.get("thread", "")
         window = self.props.active_window
-        if key and window is not None:
+        if window is None:
+            return 0
+        key = options.get("thread", "")
+        if key:
             window.open_thread(key)
+        handle = options.get("message", "")
+        if handle:
+            window.open_message_handle(handle)
         return 0
 
     def do_shutdown(self) -> None:
