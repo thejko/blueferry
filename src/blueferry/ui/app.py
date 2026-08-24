@@ -31,6 +31,18 @@ _CSS = """
   background: @accent_bg_color;
   color: @accent_fg_color;
 }
+/* The composer is a scrolled window wrapping a text view. Rounding it means
+   rounding the scrolled window and clearing the view's own background, or the
+   view paints a square block over the corners. */
+.message-composer {
+  background: @view_bg_color;
+  border: 1px solid @borders;
+  border-radius: 12px;
+}
+.message-composer text,
+.message-composer textview {
+  background: transparent;
+}
 """
 
 

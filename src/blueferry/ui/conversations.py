@@ -37,6 +37,7 @@ class MessageComposer(Gtk.ScrolledWindow):
             max_content_height=150,
             propagate_natural_height=True,
             hexpand=True,
+            css_classes=["message-composer"],
         )
         self._view = build_message_view(
             accepts_tab=False,
