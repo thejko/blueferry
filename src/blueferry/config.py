@@ -163,20 +163,26 @@ SHOW_NOTIFICATION_CONTENT: bool = _env_bool(
     "BLUEFERRY_SHOW_NOTIFICATION_CONTENT", True
 )
 NOTIFICATION_TIMEOUT_MS: int = _env_int(
-    "BLUEFERRY_NOTIFICATION_TIMEOUT_MS", 8_000, 1_000, 60_000
+    "BLUEFERRY_NOTIFICATION_TIMEOUT_MS", 20_000, 1_000, 60_000
 )
+"""How long a message popup stays up. Long enough to notice across the room,
+short enough that a quiet hour does not leave a wall of them.
+
+Servers clamp this. Omarchy's, for one, allows 8s to 30s at normal urgency.
+"""
 
 NOTIFICATION_URGENCIES: frozenset[str] = frozenset({"low", "normal", "critical"})
 NOTIFICATION_URGENCY: str = _env_choice(
-    "BLUEFERRY_NOTIFICATION_URGENCY", "critical", NOTIFICATION_URGENCIES
+    "BLUEFERRY_NOTIFICATION_URGENCY", "normal", NOTIFICATION_URGENCIES
 )
 """Urgency byte for message popups.
 
-`critical` is the default because a message you miss is worse than a popup you
-have to dismiss. Notification daemons keep critical popups on screen until they
-are acted on, which makes NOTIFICATION_TIMEOUT_MS moot at that level. Nothing
-is stranded: dismissing marks the message read on the iPhone, and reading it on
-the iPhone closes the popup.
+Deliberately not `critical`. Servers read critical as "stays until acted on"
+and never expire it, so a busy thread leaves a wall of popups that outlives
+reading the messages. Reading a conversation in a client does not currently
+mark it read over MAP, so nothing else clears them either. Normal urgency plus
+NOTIFICATION_TIMEOUT_MS decays on its own; the alert sound is what makes a
+message hard to miss.
 """
 
 OPEN_MESSAGE_COMMAND: str = os.environ.get(
