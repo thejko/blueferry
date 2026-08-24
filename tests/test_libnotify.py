@@ -243,3 +243,72 @@ def test_expiry_and_phone_read_do_not_write_read_state(reason) -> None:
     sink._on_closed(7, reason)
 
     assert queued == []
+
+
+class _FakeSessionBus:
+    """Records what the sink asks of the session bus."""
+
+    def __init__(self) -> None:
+        self.get_object_calls = []
+        self.signal_receivers = []
+
+    def get_object(self, bus_name, path, **kwargs):
+        self.get_object_calls.append((bus_name, path, kwargs))
+        return _FakeProxy()
+
+    def add_signal_receiver(self, handler, **kwargs):
+        self.signal_receivers.append((handler, kwargs))
+        return SimpleNamespace(remove=lambda: None)
+
+
+class _FakeProxy:
+    def connect_to_signal(self, *args, **kwargs):
+        return SimpleNamespace(remove=lambda: None)
+
+
+def test_sink_addresses_the_notification_server_by_well_known_name(
+    monkeypatch,
+) -> None:
+    """A restarted server must not strand the sink on a dead unique name."""
+    bus = _FakeSessionBus()
+    monkeypatch.setattr(libnotify_mod, "get_session_bus", lambda: bus)
+
+    LibnotifySink(submit_obex=lambda *a, **k: None)
+
+    name, path, kwargs = bus.get_object_calls[0]
+    assert name == "org.freedesktop.Notifications"
+    assert path == "/org/freedesktop/Notifications"
+    assert kwargs["follow_name_owner_changes"] is True
+
+    watched = [
+        kw for _handler, kw in bus.signal_receivers
+        if kw.get("signal_name") == "NameOwnerChanged"
+    ]
+    assert watched and watched[0]["arg0"] == "org.freedesktop.Notifications"
+
+
+def test_replacing_the_server_drops_stale_popup_trackers() -> None:
+    removed = []
+    sink = LibnotifySink.__new__(LibnotifySink)
+    sink._pending = {1: "/msg/one"}
+    sink._open_messages = {1: "handle-one"}
+    sink._msg_subs = {1: SimpleNamespace(remove=lambda: removed.append(1))}
+
+    sink._on_server_replaced("org.freedesktop.Notifications", ":1.7", ":1.9")
+
+    assert sink._pending == {}
+    assert sink._open_messages == {}
+    assert sink._msg_subs == {}
+    assert removed == [1]
+
+
+def test_first_appearance_of_the_server_keeps_trackers() -> None:
+    sink = LibnotifySink.__new__(LibnotifySink)
+    sink._pending = {1: "/msg/one"}
+    sink._open_messages = {1: "handle-one"}
+    sink._msg_subs = {}
+
+    sink._on_server_replaced("org.freedesktop.Notifications", "", ":1.9")
+
+    assert sink._pending == {1: "/msg/one"}
+    assert sink._open_messages == {1: "handle-one"}

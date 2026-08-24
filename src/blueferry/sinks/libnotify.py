@@ -42,6 +42,9 @@ class _SignalMatch(Protocol):
 
 log = logging.getLogger(__name__)
 
+_DBUS_BUS_NAME = "org.freedesktop.DBus"
+_DBUS_INTERFACE = "org.freedesktop.DBus"
+
 _APP_NAME = "BlueFerry"
 _BODY_LIMIT = 280
 _MESSAGE_EXPIRE_MS = config.NOTIFICATION_TIMEOUT_MS
@@ -92,10 +95,18 @@ class LibnotifySink:
         self._notification_policy = notification_policy
         self._on_open_message = on_open_message
         self._alert = AlertSound(config.NOTIFICATION_SOUND)
+        # Address the server by its well-known name on every call.
+        # dbus-python's default resolves that name to the owner's *unique*
+        # name once, at construction, and never revisits it -- so restarting
+        # the notification server (on Omarchy a theme change restarts the
+        # Quickshell that owns it) leaves every later Notify failing with
+        # ServiceUnknown while messages keep arriving normally. Nothing looks
+        # broken from the outside; the popups simply stop.
         self._notif = dbus.Interface(
             get_session_bus().get_object(
                 "org.freedesktop.Notifications",
                 "/org/freedesktop/Notifications",
+                follow_name_owner_changes=True,
             ),
             "org.freedesktop.Notifications",
         )
@@ -116,7 +127,35 @@ class LibnotifySink:
         self._action_match = self._notif.connect_to_signal(
             "ActionInvoked", self._on_action,
         )
+        # Notification ids are the server's, and a replacement server hands
+        # them out from scratch. Left in place, a stale id would map the new
+        # server's first popup onto an old message and mark the wrong one
+        # read on the iPhone.
+        self._owner_match = get_session_bus().add_signal_receiver(
+            self._on_server_replaced,
+            dbus_interface=_DBUS_INTERFACE,
+            signal_name="NameOwnerChanged",
+            bus_name=_DBUS_BUS_NAME,
+            arg0="org.freedesktop.Notifications",
+        )
         log.info("libnotify sink ready (expiring + bidirectional read-sync)")
+
+    def _on_server_replaced(self, _name, old_owner, new_owner) -> None:
+        """Forget the popups that left with the departing server."""
+        if not str(old_owner):
+            return  # first appearance -- there is nothing tracked yet
+        self._pending.clear()
+        getattr(self, "_open_messages", {}).clear()
+        for subscription in self._msg_subs.values():
+            try:
+                subscription.remove()
+            except Exception:
+                log.debug("could not remove message read-state watch", exc_info=True)
+        self._msg_subs.clear()
+        log.info(
+            "notification server replaced (%s -> %s); dropped popup trackers",
+            str(old_owner), str(new_owner) or "none",
+        )
 
     def _policy(self) -> str:
         provider = getattr(self, "_notification_policy", None)
