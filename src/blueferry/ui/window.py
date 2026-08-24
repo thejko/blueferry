@@ -21,13 +21,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._configured = SetupClient().configuration().configured
         self._initial_setup_pending = not self._configured
 
-        header = Adw.HeaderBar(
-            title_widget=Adw.WindowTitle(
-                title=_("BlueFerry"),
-                subtitle=_("Messages"),
-            )
-        )
-
         menu = Gio.Menu()
         menu.append(_("iPhone Settings"), "win.phone")
         menu.append(_("Keyboard Shortcuts"), "app.shortcuts")
@@ -38,7 +31,9 @@ class MainWindow(Adw.ApplicationWindow):
             tooltip_text=_("Main Menu"),
         )
         menu_button.update_property([Gtk.AccessibleProperty.LABEL], [_("Main Menu")])
-        header.pack_end(menu_button)
+        # Sits left of "Conversations", the way a messaging app puts it, rather
+        # than in a window-wide bar that exists only to hold it.
+        self.messages.pack_sidebar_start(menu_button)
 
         phone_action = Gio.SimpleAction.new("phone", None)
         phone_action.connect("activate", lambda *_args: self.present_phone_settings())
@@ -68,13 +63,12 @@ class MainWindow(Adw.ApplicationWindow):
             lambda _banner: self.present_phone_settings(),
         )
 
-        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        content.append(self._banner)
-        content.append(self.messages)
-        self._toasts.set_child(content)
+        self._toasts.set_child(self.messages)
 
+        # The split view's pages carry the header bars now, so the window has
+        # no top bar of its own. The banner still needs to sit above them.
         toolbar = Adw.ToolbarView()
-        toolbar.add_top_bar(header)
+        toolbar.add_top_bar(self._banner)
         toolbar.set_content(self._toasts)
         self.set_content(toolbar)
 

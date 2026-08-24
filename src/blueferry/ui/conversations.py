@@ -150,21 +150,17 @@ class ConversationsPage(Gtk.Box):
             vexpand=True,
             child=self._thread_list,
         )
-        sidebar_header = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6,
-            margin_top=6,
-            margin_bottom=6,
-            margin_start=10,
-            margin_end=6,
-        )
-        sidebar_header.append(
-            Gtk.Label(
+        # One header bar per split-view page rather than a window-wide bar
+        # stacked on top of them: that second row is what made the title area
+        # twice as tall as it needed to be.
+        self._sidebar_header = Adw.HeaderBar(
+            # Window controls belong on the content side, not over the list.
+            show_end_title_buttons=False,
+            title_widget=Gtk.Label(
                 label=_("Conversations"),
                 css_classes=["heading"],
-                hexpand=True,
                 xalign=0,
-            )
+            ),
         )
         self._new_message_button = Gtk.Button(
             icon_name="list-add-symbolic",
@@ -175,11 +171,9 @@ class ConversationsPage(Gtk.Box):
             [Gtk.AccessibleProperty.LABEL], [_("New Message")]
         )
         self._new_message_button.connect("clicked", self._open_new_message)
-        sidebar_header.append(self._new_message_button)
-        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        sidebar.append(sidebar_header)
-        sidebar.append(Gtk.Separator())
-        sidebar.append(sidebar_scroll)
+        self._sidebar_header.pack_end(self._new_message_button)
+        sidebar = Adw.ToolbarView(content=sidebar_scroll)
+        sidebar.add_top_bar(self._sidebar_header)
         sidebar_page = Adw.NavigationPage(
             child=sidebar,
             title=_("Conversations"),
@@ -208,14 +202,9 @@ class ConversationsPage(Gtk.Box):
         self._stack = Gtk.Stack(hexpand=True, vexpand=True)
         self._stack.add_named(self._placeholder, "empty")
         self._stack.add_named(self._msg_scroll, "messages")
-        conversation_header = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6,
-            margin_top=6,
-            margin_bottom=6,
-            margin_start=6,
-            margin_end=6,
-        )
+        # An empty title widget keeps the thread name left-aligned next to the
+        # back button instead of centring it away from the conversation.
+        conversation_header = Adw.HeaderBar(title_widget=Gtk.Label())
         self.back_button = Gtk.Button(
             icon_name="go-previous-symbolic",
             tooltip_text=_("Back to Conversations"),
@@ -228,7 +217,6 @@ class ConversationsPage(Gtk.Box):
         self._conversation_title = Gtk.Label(
             label=_("Messages"),
             css_classes=["heading"],
-            hexpand=True,
             xalign=0,
             ellipsize=_ELLIPSIZE_END,
         )
@@ -244,11 +232,9 @@ class ConversationsPage(Gtk.Box):
         self._group_roster_button.connect(
             "clicked", self._open_group_roster_dialog
         )
-        conversation_header.append(self.back_button)
-        conversation_header.append(self._conversation_title)
-        conversation_header.append(self._group_roster_button)
-        right.append(conversation_header)
-        right.append(Gtk.Separator())
+        conversation_header.pack_start(self.back_button)
+        conversation_header.pack_start(self._conversation_title)
+        conversation_header.pack_end(self._group_roster_button)
         self._group_roster_banner = Adw.Banner()
         self._group_roster_banner.set_button_label(_("Add Participants"))
         self._group_roster_banner.set_revealed(False)
@@ -283,7 +269,9 @@ class ConversationsPage(Gtk.Box):
         compose.append(self._send_btn)
         right.append(Gtk.Separator())
         right.append(compose)
-        content_page = Adw.NavigationPage(child=right, title=_("Messages"))
+        content = Adw.ToolbarView(content=right)
+        content.add_top_bar(conversation_header)
+        content_page = Adw.NavigationPage(child=content, title=_("Messages"))
         self.split_view = Adw.NavigationSplitView(
             sidebar=sidebar_page,
             content=content_page,
@@ -370,6 +358,10 @@ class ConversationsPage(Gtk.Box):
         self._pending_open_handle = handle
         if not self._select_pending_message():
             self._reload_threads()
+
+    def pack_sidebar_start(self, widget) -> None:
+        """Place a widget at the left edge of the conversation list header."""
+        self._sidebar_header.pack_start(widget)
 
     def open_thread(self, key: str) -> None:
         """Select a thread by key, refreshing if it is not loaded yet."""
